@@ -18,12 +18,32 @@ app.get('/api/test', (req, res) => {
 wss.on('connection', (ws) => {
   console.log('WebSocket connection established');
 
-  ws.send('Hello from Server!');
+  // Initialize room property for the client
+  ws.room = null;
 
   ws.on('message', (message) => {
-    const msg = message.toString();
-    console.log('Received message from client:', msg);
-    ws.send(`Server received: ${msg}`);
+    const msg = JSON.parse(message.toString());
+
+    if (msg.type === 'join') {
+      // Handle joining a room
+      ws.room = msg.room;
+      console.log(`Client joined room: ${msg.room}`);
+      console.log(`Assigned room to client: ${ws.room}`);
+    } else if (msg.type === 'message') {
+      // Broadcast message to clients in the same room
+      console.log('Broadcasting message to clients in room:', ws.room);
+      wss.clients.forEach((client) => {
+        console.log(`Comparing client and sender: client === sender -> ${client === ws}`);
+        console.log(`Client room: ${client.room}, Sender room: ${ws.room}`);
+        if (
+          client.readyState === WebSocket.OPEN &&
+          client.room === ws.room &&
+          client !== ws
+        ) {
+          client.send(`${msg.id}: ${msg.message}`);
+        }
+      });
+    }
   });
 
   ws.on('close', () => {
